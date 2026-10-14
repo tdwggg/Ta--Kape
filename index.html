@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cement & Coffee System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    
+    <!-- Firebase SDKs (v8 Compat for single-file deployment) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="nav-brand">Cement & Coffee</div>
+        <div id="nav-actions">
+            <span id="user-display">Guest User</span>
+            <button id="btn-logout" class="btn btn-secondary" style="display:none;" onclick="logout()">Logout</button>
+            <button id="btn-login-nav" class="btn btn-primary" onclick="showView('auth-view')">Login / Sign Up</button>
+        </div>
+    </nav>
+
+    <div class="container">
+        
+        <!-- PUBLIC / GUEST VIEW -->
+        <div id="public-view" class="view-section active">
+            <h2>Our Menu</h2>
+            <p>Please log in or sign up to place an order.</p>
+            <div class="menu-grid" id="public-menu-container">
+                <!-- Populated dynamically -->
+            </div>
+        </div>
+
+        <!-- AUTHENTICATION VIEW -->
+        <div id="auth-view" class="view-section card">
+            <h2>Login / Registration</h2>
+            <select id="auth-role">
+                <option value="customer">I am a Customer</option>
+                <option value="rider">I am a Rider</option>
+                <option value="cashier">Staff: Cashier</option>
+                <option value="admin">Staff: Admin</option>
+            </select>
+            
+            <input type="email" id="auth-email" placeholder="Email">
+            <input type="password" id="auth-password" placeholder="Password">
+            
+            <!-- Extra Registration Fields -->
+            <div id="register-fields" style="display:none; border-top:1px solid #9ba0a5; padding-top:10px; margin-top:10px;">
+                <input type="text" id="reg-lname" placeholder="Last Name">
+                <input type="text" id="reg-fname" placeholder="First Name">
+                <input type="text" id="reg-mname" placeholder="Middle Name (Optional)">
+                <input type="text" id="reg-address" placeholder="Delivery Address">
+                
+                <!-- Rider Specific Inputs -->
+                <div id="rider-fields" style="display:none;">
+                    <input type="text" id="reg-plate" placeholder="Motorcycle Plate Number">
+                    <input type="text" id="reg-brand" placeholder="Motorcycle Brand (e.g., Honda Click)">
+                    <p style="font-size: 12px; color: #d9534f;">* Face verification will be required upon onboarding.</p>
+                </div>
+            </div>
+
+            <button class="btn btn-primary" onclick="login()">Login</button>
+            <button class="btn btn-secondary" onclick="toggleRegister()">Need an account? Sign Up</button>
+            <button id="btn-do-register" class="btn btn-primary" style="display:none;" onclick="register()">Submit Registration</button>
+        </div>
+
+        <!-- 1. CUSTOMER DASHBOARD -->
+        <div id="customer-view" class="view-section">
+            <h2>Welcome back, <span id="cust-name"></span></h2>
+            
+            <div class="dashboard-grid">
+                <div class="card">
+                    <h3>Order Menu</h3>
+                    <div id="cust-menu-container"></div>
+                </div>
+                
+                <div class="card">
+                    <h3>Your Cart</h3>
+                    <ul id="cust-cart" style="list-style:none; padding:0;"></ul>
+                    <hr>
+                    <p>Total: ₱<span id="cust-total">0.00</span></p>
+                    <input type="number" id="cust-tip" placeholder="Tip for Rider (Optional)">
+                    <select id="cust-payment">
+                        <option value="cod">Cash on Delivery</option>
+                        <option value="gcash">GCash</option>
+                        <option value="card">Credit Card</option>
+                    </select>
+                    <button class="btn btn-primary u-full-width" onclick="checkout()">Place Order</button>
+                </div>
+                
+                <div class="card">
+                    <h3>Active Delivery</h3>
+                    <div id="active-order-status">No active orders.</div>
+                    <div id="rider-details" style="display:none; margin-top:15px; border:1px solid #9ba0a5; padding:10px;">
+                        <h4>Rider Details</h4>
+                        <p>Name: <span id="r-name"></span></p>
+                        <p>Motor: <span id="r-brand"></span> | Plate: <span id="r-plate"></span></p>
+                        <button class="btn btn-danger" onclick="reportRider()">Report Rider Violation</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. CASHIER DASHBOARD -->
+        <div id="cashier-view" class="view-section">
+            <h2>Point of Sale (POS) - Cashier</h2>
+            <div class="dashboard-grid">
+                <div class="card">
+                    <h3>Walk-in POS</h3>
+                    <div id="cashier-menu"></div>
+                </div>
+                <div class="card">
+                    <h3>Current Punch</h3>
+                    <ul id="pos-cart" style="list-style:none; padding:0;"></ul>
+                    <hr>
+                    <p>Total: ₱<span id="pos-total">0.00</span></p>
+                    <button class="btn btn-secondary" onclick="undoLastPunch()">Undo Last Punch</button>
+                    <button class="btn btn-primary" style="margin-top:10px;" onclick="processPOS()">Process & Print Receipt</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. ADMIN DASHBOARD -->
+        <div id="admin-view" class="view-section">
+            <h2>Admin Dashboard</h2>
+            <div class="dashboard-grid">
+                <div class="card">
+                    <h3>Inventory Management</h3>
+                    <div id="admin-inventory-list"></div>
+                    <hr>
+                    <input type="text" id="new-prod-name" placeholder="Product Name">
+                    <input type="number" id="new-prod-price" placeholder="Price">
+                    <input type="number" id="new-prod-stock" placeholder="Initial Stock">
+                    <button class="btn btn-primary" onclick="addProduct()">Add Product</button>
+                </div>
+                <div class="card">
+                    <h3>Sales & Operations</h3>
+                    <p>Total Revenue: ₱<span id="admin-revenue">0.00</span></p>
+                    <h4>Low Stock Alerts:</h4>
+                    <ul id="low-stock-list" style="color:var(--danger)"></ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. RIDER DASHBOARD -->
+        <div id="rider-view" class="view-section">
+            <h2>Rider Dashboard</h2>
+            <div class="dashboard-grid">
+                <div class="card">
+                    <h3>Available Orders</h3>
+                    <div id="available-orders-list"></div>
+                </div>
+                <div class="card">
+                    <h3>My Current Delivery</h3>
+                    <div id="rider-active-delivery">No active delivery.</div>
+                    <div id="rider-controls" style="display:none; margin-top:10px;">
+                        <button class="btn btn-primary" onclick="updateOrderStatus('Picked Up')">Mark Picked Up</button>
+                        <button class="btn btn-primary" onclick="updateOrderStatus('Arriving')">Mark Arriving</button>
+                        <button class="btn btn-primary" onclick="updateOrderStatus('Delivered')">Mark Delivered</button>
+                        <hr>
+                        <button class="btn btn-danger" onclick="reportFakeBooking()">Report Fake Booking</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // ==========================================
+        // FIREBASE INITIALIZATION WITH YOUR CREDENTIALS
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyDNhUdxQXnBjOQ8edNIk58sWs2XbIQiJbQ",
+            authDomain: "coffee-shop-265e8.firebaseapp.com",
+            projectId: "coffee-shop-265e8",
+            storageBucket: "coffee-shop-265e8.firebasestorage.app",
+            messagingSenderId: "1071737004518",
+            appId: "1:1071737004518:web:68a258bc0a3a06a8c03627"
+        };
+        
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // ==========================================
+        // STATE MANAGEMENT
+        // ==========================================
+        let currentUserRole = 'guest';
+        let currentUserDoc = null;
+        let cart = [];
+
+        // Watch Authentication State
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                const doc = await db.collection('users').doc(user.uid).get();
+                if(doc.exists) {
+                    currentUserDoc = doc.data();
+                    currentUserRole = currentUserDoc.role;
+                    document.getElementById('user-display').innerText = currentUserDoc.fname || user.email;
+                    document.getElementById('btn-login-nav').style.display = 'none';
+                    document.getElementById('btn-logout').style.display = 'inline-block';
+                    routeUser(currentUserRole);
+                }
+            } else {
+                currentUserRole = 'guest';
+                currentUserDoc = null;
+                document.getElementById('user-display').innerText = 'Guest User';
+                document.getElementById('btn-login-nav').style.display = 'inline-block';
+                document.getElementById('btn-logout').style.display = 'none';
+                showView('public-view');
+                loadMenu('public');
+            }
+        });
+
+        function showView(viewId) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+        }
+
+        function routeUser(role) {
+            if(role === 'customer') { 
+                showView('customer-view'); 
+                document.getElementById('cust-name').innerText = currentUserDoc.fname || '';
+                loadMenu('customer'); 
+                listenToActiveOrder(); 
+            }
+            if(role === 'cashier') { showView('cashier-view'); loadMenu('cashier'); }
+            if(role === 'admin') { showView('admin-view'); loadAdminDashboard(); }
+            if(role === 'rider') { showView('rider-view'); listenToAvailableOrders(); }
+        }
+
+        // ==========================================
+        // AUTHENTICATION LOGIC
+        // ==========================================
+        let isRegistering = false;
+        
+        document.getElementById('auth-role').addEventListener('change', (e) => {
+            document.getElementById('rider-fields').style.display = (e.target.value === 'rider') ? 'block' : 'none';
+        });
+
+        function toggleRegister() {
+            isRegistering = true;
+            document.getElementById('register-fields').style.display = 'block';
+            document.getElementById('btn-do-register').style.display = 'inline-block';
+        }
+
+        async function register() {
+            const email = document.getElementById('auth-email').value;
+            const pass = document.getElementById('auth-password').value;
+            const role = document.getElementById('auth-role').value;
+            try {
+                const cred = await auth.createUserWithEmailAndPassword(email, pass);
+                await db.collection('users').doc(cred.user.uid).set({
+                    role: role,
+                    fname: document.getElementById('reg-fname').value,
+                    lname: document.getElementById('reg-lname').value,
+                    mname: document.getElementById('reg-mname').value || '',
+                    address: document.getElementById('reg-address').value,
+                    plate: document.getElementById('reg-plate').value || '',
+                    brand: document.getElementById('reg-brand').value || ''
+                });
+                alert("Registration successful!");
+            } catch (error) { alert(error.message); }
+        }
+
+        async function login() {
+            const email = document.getElementById('auth-email').value;
+            const pass = document.getElementById('auth-password').value;
+            try { await auth.signInWithEmailAndPassword(email, pass); } 
+            catch (error) { alert(error.message); }
+        }
+
+        function logout() { auth.signOut(); }
+
+        // ==========================================
+        // SHARED MENU & CART LOGIC
+        // ==========================================
+        async function loadMenu(target) {
+            const snapshot = await db.collection('products').get();
+            let html = '';
+            snapshot.forEach(doc => {
+                let p = doc.data();
+                let btn = target !== 'public' ? `<button class="btn btn-secondary" onclick="addToCart('${doc.id}', '${p.name}', ${p.price})">Add (₱${p.price})</button>` : `<p>₱${p.price}</p>`;
+                html += `<div class="card" style="margin-bottom:10px;"><h4>${p.name}</h4><p>Stock: ${p.stock}</p>${btn}</div>`;
+            });
+            if(target === 'public') document.getElementById('public-menu-container').innerHTML = html;
+            if(target === 'customer') document.getElementById('cust-menu-container').innerHTML = html;
+            if(target === 'cashier') document.getElementById('cashier-menu').innerHTML = html;
+        }
+
+        function addToCart(id, name, price) {
+            cart.push({id, name, price});
+            renderCart();
+        }
+
+        function renderCart() {
+            let html = ''; let total = 0;
+            cart.forEach((item) => {
+                html += `<li>${item.name} - ₱${item.price}</li>`;
+                total += parseFloat(item.price);
+            });
+            if(currentUserRole === 'customer') {
+                document.getElementById('cust-cart').innerHTML = html;
+                document.getElementById('cust-total').innerText = total.toFixed(2);
+            } else if(currentUserRole === 'cashier') {
+                document.getElementById('pos-cart').innerHTML = html;
+                document.getElementById('pos-total').innerText = total.toFixed(2);
+            }
+        }
+
+        // ==========================================
+        // CUSTOMER SPECIFIC LOGIC
+        // ==========================================
+        async function checkout() {
+            if(cart.length === 0) return alert("Cart is empty");
+            const tip = parseFloat(document.getElementById('cust-tip').value || 0);
+            let total = cart.reduce((sum, item) => sum + parseFloat(item.price), 0) + tip;
+            
+            await db.collection('orders').add({
+                customerId: auth.currentUser.uid,
+                customerName: (currentUserDoc.fname || '') + ' ' + (currentUserDoc.lname || ''),
+                address: currentUserDoc.address || 'Walk-In / Unknown',
+                items: cart,
+                tip: tip,
+                total: total,
+                paymentMethod: document.getElementById('cust-payment').value,
+                status: 'Preparing',
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            cart = []; renderCart(); alert("Order placed!");
+        }
+
+        function listenToActiveOrder() {
+            db.collection('orders').where('customerId', '==', auth.currentUser.uid)
+              .where('status', 'in', ['Preparing', 'Picked Up', 'Arriving'])
+              .onSnapshot(snapshot => {
+                  if(!snapshot.empty) {
+                      const order = snapshot.docs[0].data();
+                      document.getElementById('active-order-status').innerHTML = `<h3>Status: <span class="status-${order.status.toLowerCase().replace(' ','-')}">${order.status}</span></h3>`;
+                      
+                      if(order.riderId) {
+                          document.getElementById('rider-details').style.display = 'block';
+                          document.getElementById('r-name').innerText = order.riderName;
+                          document.getElementById('r-brand').innerText = order.riderBrand;
+                          document.getElementById('r-plate').innerText = order.riderPlate;
+                      }
+                  } else {
+                      document.getElementById('active-order-status').innerHTML = "No active orders.";
+                      document.getElementById('rider-details').style.display = 'none';
+                  }
+              });
+        }
+
+        function reportRider() { alert("Report filed to admin regarding rider behavior. We will review this immediately."); }
+
+        // ==========================================
+        // CASHIER SPECIFIC LOGIC (POS & Print)
+        // ==========================================
+        function undoLastPunch() {
+            if(cart.length > 0) { cart.pop(); renderCart(); }
+        }
+
+        async function processPOS() {
+            if(cart.length === 0) return alert("No items punched");
+            let total = cart.reduce((sum, item) => sum + parseFloat(item.price), 0);
+            let itemString = cart.map(i => `${i.name}-1-${i.price}`).join(',');
+            let orderId = 'POS-' + Math.floor(Math.random() * 10000);
+            
+            window.open(`/receipt?order_id=${orderId}&total=${total}&items=${encodeURIComponent(itemString)}&customer=Walk-In`, '_blank');
+            cart = []; renderCart();
+        }
+
+        // ==========================================
+        // ADMIN SPECIFIC LOGIC
+        // ==========================================
+        async function loadAdminDashboard() {
+            db.collection('products').onSnapshot(snapshot => {
+                let html = ''; let lowStockHtml = '';
+                snapshot.forEach(doc => {
+                    let p = doc.data();
+                    html += `<p>${p.name} - Stock: ${p.stock} <button class="btn btn-danger" onclick="deleteProduct('${doc.id}')">Del</button></p>`;
+                    if(p.stock < 10) lowStockHtml += `<li>${p.name} is low (${p.stock} left)</li>`;
+                });
+                document.getElementById('admin-inventory-list').innerHTML = html;
+                document.getElementById('low-stock-list').innerHTML = lowStockHtml || '<li>All stock optimal.</li>';
+            });
+        }
+
+        async function addProduct() {
+            await db.collection('products').add({
+                name: document.getElementById('new-prod-name').value,
+                price: parseFloat(document.getElementById('new-prod-price').value),
+                stock: parseInt(document.getElementById('new-prod-stock').value)
+            });
+            document.getElementById('new-prod-name').value = '';
+            document.getElementById('new-prod-price').value = '';
+            document.getElementById('new-prod-stock').value = '';
+        }
+        
+        async function deleteProduct(id) { await db.collection('products').doc(id).delete(); }
+
+        // ==========================================
+        // RIDER SPECIFIC LOGIC
+        // ==========================================
+        let currentOrderId = null;
+
+        function listenToAvailableOrders() {
+            db.collection('orders').where('status', '==', 'Preparing').onSnapshot(snapshot => {
+                let html = '';
+                snapshot.forEach(doc => {
+                    let o = doc.data();
+                    html += `<div class="card"><p>To: ${o.address}</p><p>Total: ₱${o.total} (Tip: ₱${o.tip})</p><button class="btn btn-primary" onclick="acceptOrder('${doc.id}')">Accept Order</button></div>`;
+                });
+                document.getElementById('available-orders-list').innerHTML = html || '<p>No available orders right now.</p>';
+            });
+        }
+
+        async function acceptOrder(orderId) {
+            currentOrderId = orderId;
+            await db.collection('orders').doc(orderId).update({
+                status: 'Picked Up',
+                riderId: auth.currentUser.uid,
+                riderName: (currentUserDoc.fname || '') + ' ' + (currentUserDoc.lname || ''),
+                riderPlate: currentUserDoc.plate || 'N/A',
+                riderBrand: currentUserDoc.brand || 'N/A'
+            });
+            document.getElementById('rider-active-delivery').innerText = "Delivery in progress...";
+            document.getElementById('rider-controls').style.display = 'block';
+        }
+
+        async function updateOrderStatus(status) {
+            if(!currentOrderId) return;
+            await db.collection('orders').doc(currentOrderId).update({ status: status });
+            if(status === 'Delivered') {
+                document.getElementById('rider-active-delivery').innerText = "No active delivery.";
+                document.getElementById('rider-controls').style.display = 'none';
+                currentOrderId = null;
+            }
+        }
+        
+        function reportFakeBooking() { alert("Report filed. Admin will investigate this address."); }
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Ta' Kape — Cement & Coffee System</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+</head>
+<body>
+<nav class="navbar">
+  <div class="nav-inner">
+    <div class="brand"><div class="brand-mark">☕</div><div>TA' KAPE<small>CEMENT • COFFEE • COMMUNITY</small></div></div>
+    <div class="nav-links" id="nav-links">
+      <button data-nav="public-view" class="active" onclick="showView('public-view')">Menu</button>
+      <button data-nav="reserve" onclick="goReserve()">Reserve</button>
+      <button data-nav="track" onclick="goTrack()">Track Order</button>
+      <button id="btn-login-nav" onclick="showView('auth-view')">Login / Sign Up</button>
+      <span id="user-display">Guest User</span>
+      <button id="btn-logout" style="display:none" onclick="logout()">Logout</button>
+    </div>
+    <button class="hamburger" onclick="document.getElementById('nav-links').classList.toggle('open')">☰</button>
+  </div>
+</nav>
+
+<div class="container">
+  <div class="hero">
+    <h1>TA' KAPE <span>— brewed on concrete.</span></h1>
+    <p>Industrial gray-cement café. Order online for delivery, walk in for POS, reserve a brutalist table, earn <b>Beans 🫘</b> loyalty points. Works on PC & phone.</p>
+    <div class="hero-badges">
+      <span class="badge gold">● OPEN 7AM – 10PM</span>
+      <span class="badge">🛵 Live rider GPS</span>
+      <span class="badge">🧾 Dual auto-print receipt</span>
+      <span class="badge">🔥 Low-stock alerts</span>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="showView('public-view')">Browse Menu</button>
+      <button class="btn btn-ghost" onclick="goReserve()">Book a Table</button>
+    </div>
+  </div>
+
+  <!-- PUBLIC -->
+  <section id="public-view" class="view-section active">
+    <div class="card">
+      <h3>Our Menu — no login needed to browse</h3>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input id="public-search" placeholder="Search coffee... e.g. latte" oninput="renderPublic()" style="flex:2;min-width:160px">
+        <select id="public-filter" onchange="renderPublic()" style="flex:1;min-width:140px">
+          <option value="all">All</option><option value="hot">Hot</option><option value="iced">Iced</option><option value="pastry">Pastry</option>
+        </select>
+      </div>
+      <p class="receipt-hint">Log in or sign up to order. Walk-ins welcome at the counter.</p>
+    </div>
+    <div class="menu-grid" id="public-menu-container"></div>
+    <div class="card"><h3>Visit the shop</h3><p>📍 123 Cement St., Brgy. Industrial • 📞 <span id="shop-phone">0917-000-0000</span> • GCash: <b>0917-000-0000 (TA' KAPE)</b> — mock demo, no real charge.</p></div>
+  </section>
+
+  <!-- AUTH : unique logins per side -->
+  <section id="auth-view" class="view-section card">
+    <h3>Login / Sign Up — pick your side</h3>
+    <div class="role-tabs">
+      <div class="role-tab active" data-role="customer" onclick="setAuthRole('customer')">🧋<br>Customer</div>
+      <div class="role-tab" data-role="rider" onclick="setAuthRole('rider')">🛵<br>Rider</div>
+      <div class="role-tab" data-role="cashier" onclick="setAuthRole('cashier')">🧾<br>Cashier</div>
+      <div class="role-tab" data-role="admin" onclick="setAuthRole('admin')">🛠️<br>Admin</div>
+    </div>
+    <div id="staff-note" class="staff-note hidden">Staff side requires a unique access code. Ask your manager. Demo: Cashier <b>TAKAPE-POS-2026</b> • Admin <b>TAKAPE-ADMIN-2026</b></div>
+    <div class="grid" style="grid-template-columns:1fr 1fr">
+      <div><label>Email (login)</label><input id="auth-email" type="email" placeholder="you@email.com"></div>
+      <div><label>Password</label><input id="auth-password" type="password" placeholder="••••••••"></div>
+    </div>
+    <div id="register-fields" style="display:none;border-top:2px dashed #888d91;padding-top:10px">
+      <div class="grid" style="grid-template-columns:1fr 1fr 1fr">
+        <div><label>First Name *</label><input id="reg-fname" placeholder="Juan"></div>
+        <div><label>Last Name *</label><input id="reg-lname" placeholder="Dela Cruz"></div>
+        <div><label>Middle Name (optional)</label><input id="reg-mname" placeholder="Optional"></div>
+      </div>
+      <label>Address *</label><input id="reg-address" placeholder="House / Street / Brgy / City">
+      <div class="grid" style="grid-template-columns:1fr 1fr">
+        <div><label>Contact Number or Email *</label><input id="reg-contact" placeholder="09xx-xxx-xxxx"></div>
+        <div id="staffcode-wrap" class="hidden"><label>Staff Access Code *</label><input id="reg-staffcode" placeholder="TAKAPE-..."></div>
+      </div>
+      <div id="rider-fields" style="display:none">
+        <div class="grid" style="grid-template-columns:1fr 1fr">
+          <div><label>Motor Plate Number *</label><input id="reg-plate" placeholder="ABC-1234"></div>
+          <div><label>Motor Brand *</label><input id="reg-brand" placeholder="Honda Click 160"></div>
+        </div>
+        <label>Rider Face Photo (for customer safety) *</label>
+        <input id="reg-face" type="file" accept="image/*">
+        <div class="avatar" style="margin-bottom:8px"><span id="face-initial">🧑‍✈️</span><img id="reg-face-preview" class="hidden" alt="face"></div>
+        <p class="receipt-hint">* Face verification notice: photo is shown to customers on delivery (like Grab/FoodPanda) and stored on your profile.</p>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="login()">Login</button>
+      <button class="btn btn-secondary" onclick="toggleRegister()">Need an account? Sign Up</button>
+      <button id="btn-do-register" class="btn btn-primary hidden" onclick="register()">Submit Registration</button>
+    </div>
+  </section>
+
+  <!-- CUSTOMER -->
+  <section id="customer-view" class="view-section">
+    <div class="card"><h3>Welcome, <span id="cust-name"></span> • 🫘 <span id="beans-points">0</span> beans</h3>
+      <input id="cust-search" placeholder="Search menu..." oninput="renderCustomerMenu()" style="max-width:320px">
+    </div>
+    <div class="dashboard-grid">
+      <div class="card"><h3>Order Menu</h3><div id="cust-menu-container"></div></div>
+      <div class="card"><h3>Your Cart</h3>
+        <ul id="cust-cart" style="list-style:none;padding:0;margin:0"></ul><hr>
+        <p><b>Total: ₱<span id="cust-total">0.00</span></b></p>
+        <label>Tip for rider (optional)</label><input id="cust-tip" type="number" min="0" value="0">
+        <label>Payment method — FoodPanda/Grab format</label>
+        <div class="pay-grid">
+          <div class="pay-tile active" data-pay="cod" onclick="setPay('cod')"><span class="ico">💵</span>Cash on Delivery</div>
+          <div class="pay-tile" data-pay="gcash" onclick="setPay('gcash')"><span class="ico">📱</span>GCash</div>
+          <div class="pay-tile" data-pay="card" onclick="setPay('card')"><span class="ico">💳</span>Card</div>
+        </div>
+        <div id="gcash-box" class="hidden mapbox">Send to <b>0917-000-0000 (TA' KAPE)</b> — mock demo.<div class="qrbox">QR</div><label>GCash Ref No.</label><input id="gcash-ref" placeholder="e.g. 1234567890"></div>
+        <div id="card-box" class="hidden mapbox"><label>Card number</label><input id="card-num" inputmode="numeric" placeholder="4111 1111 1111 1111"><div class="grid" style="grid-template-columns:1fr 1fr"><input id="card-exp" placeholder="MM/YY"><input id="card-cvc" placeholder="CVC"></div><p class="receipt-hint">Demo only — never enter a real card.</p></div>
+        <button class="btn btn-primary btn-block" onclick="checkout()">Place Order</button>
+      </div>
+      <div class="card"><h3>Active Delivery</h3>
+        <div id="active-order-status">No active orders.</div>
+        <div class="timeline" id="order-timeline" style="display:none">
+          <div class="t-step" data-s="Preparing">Preparing</div><div class="t-step" data-s="Picked Up">Picked Up</div><div class="t-step" data-s="Arriving">Arriving</div><div class="t-step" data-s="Delivered">Delivered</div>
+        </div>
+        <div id="rider-details" style="display:none">
+          <div class="rider-card"><div class="avatar" id="r-photo-wrap">🛵</div>
+            <div><b id="r-name"></b><br><span style="font-size:13px">🏍 <span id="r-brand"></span> • <span id="r-plate"></span></span><br><span style="font-size:12px" id="r-live">Locating rider…</span></div>
+          </div>
+          <div class="mapbox" style="margin-top:8px"><span id="r-eta"></span><br><a id="r-maplink" href="#" target="_blank">📍 Open live location in Maps</a></div>
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"><button class="btn btn-danger btn-sm" onclick="openReport('rider')">Report rider violation</button><button class="btn btn-ghost btn-sm" onclick="confirmDelivered()">Confirm received</button></div>
+        </div>
+        <hr><h3>Table Reservation</h3>
+        <div class="grid" style="grid-template-columns:1fr 1fr"><input id="res-date" type="date"><input id="res-time" type="time"></div>
+        <div class="grid" style="grid-template-columns:1fr 1fr"><select id="res-seats"><option value="1">1 seat</option><option value="2">2 seats</option><option value="4">4 seats</option><option value="6">6 seats</option><option value="10">10+ group</option></select><input id="res-note" placeholder="Note (birthday, window seat...)"></div>
+        <button class="btn btn-secondary btn-block" onclick="makeReservation()">Book Table</button>
+      </div>
+    </div>
+    <div class="card"><h3>Order History & My Reservations</h3><div id="order-history" style="overflow:auto"></div><div id="res-list-cust"></div></div>
+  </section>
+
+  <!-- CASHIER -->
+  <section id="cashier-view" class="view-section">
+    <div class="card"><h3>Point of Sale — Cashier (<span id="cashier-name"></span>)</h3><p class="receipt-hint">Punch walk-in items. Online orders appear below — cashier confirms & prints. Undo pops the last punch. Print opens 2 copies (customer + cashier).</p></div>
+    <div class="dashboard-grid">
+      <div class="card"><h3>Tap to Punch</h3><div id="cashier-menu"></div></div>
+      <div class="card"><h3>Current Punch</h3>
+        <input id="pos-customer-name" placeholder="Customer name (Walk-in)">
+        <select id="pos-payment"><option value="cash">Cash</option><option value="gcash">GCash</option><option value="card">Card</option></select>
+        <ul id="pos-cart" style="list-style:none;padding:0"></ul><hr>
+        <p><b>Total: ₱<span id="pos-total">0.00</span></b> • Today: ₱<span id="sales-today">0.00</span></p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="undoLastPunch()">↩ Undo last</button>
+          <button class="btn btn-ghost btn-sm" onclick="clearPunch()">Clear</button>
+          <button class="btn btn-primary btn-sm" onclick="processPOS()">Process & Print ×2</button>
+        </div>
+      </div>
+      <div class="card"><h3>Online Orders to Confirm</h3><div id="online-orders-list"></div><hr><h3>Reservations</h3><div id="res-list-staff"></div></div>
+    </div>
+    <div class="card"><h3>My Punch Log</h3><div id="cashier-punches-log" style="overflow:auto"></div></div>
+  </section>
+
+  <!-- ADMIN -->
+  <section id="admin-view" class="view-section">
+    <div class="dashboard-grid">
+      <div class="card"><h3>💰 Revenue</h3><p style="font-size:28px;font-weight:900">₱<span id="stat-revenue">0.00</span></p><span class="receipt-hint">Live from Firestore orders</span></div>
+      <div class="card"><h3>🧾 Orders</h3><p style="font-size:28px;font-weight:900"><span id="stat-orders">0</span></p><button class="btn btn-ghost btn-sm" onclick="exportCSV()">⬇ Export sales CSV</button></div>
+      <div class="card"><h3>⚠️ Alerts</h3><p>Low stock: <b id="stat-low">0</b> • Reports: <b id="stat-reports">0</b></p><button class="btn btn-secondary btn-sm" onclick="seedMenu()">🌱 Seed demo menu</button></div>
+    </div>
+    <div class="dashboard-grid two">
+      <div class="card"><h3>Inventory — add / + / − / delete</h3>
+        <div id="admin-inventory-list"></div><hr>
+        <div class="grid" style="grid-template-columns:2fr 1fr 1fr"><input id="new-prod-name" placeholder="Product name"><input id="new-prod-price" type="number" placeholder="Price ₱"><input id="new-prod-stock" type="number" placeholder="Stock"></div>
+        <div class="grid" style="grid-template-columns:1fr 1fr"><select id="new-prod-cat"><option value="hot">Hot</option><option value="iced">Iced</option><option value="pastry">Pastry</option></select><input id="new-prod-desc" placeholder="Short description"></div>
+        <button class="btn btn-primary btn-block" onclick="addProduct()">Add Product</button>
+        <hr><h3>Low stock (&lt;10)</h3><ul id="low-stock-list"></ul><h3>High stock (≥50) 🏆</h3><ul id="high-stock-list"></ul>
+      </div>
+      <div class="card"><h3>Sales, Punches & Reservations</h3>
+        <div style="max-height:220px;overflow:auto"><table id="sales-table"><thead><tr><th>Order</th><th>Total</th><th>Pay</th><th>Status</th></tr></thead><tbody id="sales-body"></tbody></table></div>
+        <hr><h3>Cashier punches</h3><div id="punches-log-admin" style="max-height:160px;overflow:auto"></div>
+        <hr><h3>Reservations</h3><div id="res-list-admin"></div>
+      </div>
+    </div>
+    <div class="card"><h3>🚨 Reports inbox (rider violations + fake bookings)</h3><div id="reports-list"></div></div>
+  </section>
+
+  <!-- RIDER -->
+  <section id="rider-view" class="view-section">
+    <div class="dashboard-grid two">
+      <div class="card"><h3>My Rider Profile</h3>
+        <div class="rider-card"><div class="avatar" id="rp-photo-wrap">🛵</div><div><b id="rp-name"></b><br><span style="font-size:13px">🏍 <span id="rp-brand"></span> • <span id="rp-plate"></span></span><br><span class="receipt-hint" id="rp-contact"></span></div></div>
+        <div style="margin-top:10px"><button id="btn-share" class="btn btn-secondary btn-block" onclick="toggleShare()">📡 Start sharing live location</button><p class="receipt-hint">Uses your phone GPS → customer sees live location link. Keep tab open during delivery.</p></div>
+        <hr><h3>Available Orders (Preparing)</h3><div id="available-orders-list"></div>
+      </div>
+      <div class="card"><h3>My Current Delivery</h3>
+        <div id="rider-active-delivery">No active delivery.</div>
+        <div id="rider-controls" style="display:none;margin-top:10px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-primary btn-sm" onclick="updateOrderStatus('Picked Up')">Picked Up</button>
+            <button class="btn btn-primary btn-sm" onclick="updateOrderStatus('Arriving')">Arriving</button>
+            <button class="btn btn-primary btn-sm" onclick="updateOrderStatus('Delivered')">Delivered</button>
+          </div><hr>
+          <a id="rider-navlink" href="#" target="_blank" class="btn btn-ghost btn-sm">🧭 Navigate in Maps</a>
+          <button class="btn btn-danger btn-sm" onclick="openReport('fake')">Report fake booking here</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>TA' KAPE © 2026 • Gray-cement build • Flask <code>python app.py</code> + PHP <code>index.php</code> • Firebase Auth + Firestore (asia-southeast1) • Demo payments, no real charge.</footer>
+</div>
+
+<nav class="mobilebar">
+  <button onclick="showView('public-view')">☕ Menu</button>
+  <button onclick="goTrack()">📦 Track</button>
+  <button onclick="goReserve()">📅 Reserve</button>
+  <button onclick="showView('auth-view')">👤 Login</button>
+</nav>
+
+<div class="modal-bg" id="modal-bg"><div class="modal">
+  <h3 id="modal-title">File a report</h3>
+  <p class="receipt-hint" id="modal-sub"></p>
+  <label>Details *</label><textarea id="modal-text" rows="4" placeholder="What happened? time, place, plate..."></textarea>
+  <div style="display:flex;gap:8px"><button class="btn btn-danger" id="modal-submit" onclick="submitReport()">Submit report</button><button class="btn btn-ghost" onclick="closeReport()">Cancel</button></div>
+</div></div>
+<div id="toasts"></div>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

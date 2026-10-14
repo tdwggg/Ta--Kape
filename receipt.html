@@ -1,0 +1,74 @@
+<!-- templates/receipt.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Receipt - Order {{ order_id }}</title>
+    <style>
+        body { font-family: 'Courier New', Courier, monospace; font-size: 14px; margin: 0; padding: 0; background: #fff; color: #000; }
+        .receipt-wrapper { display: flex; flex-direction: column; align-items: center; width: 100%; }
+        .receipt { width: 300px; padding: 20px; border-bottom: 2px dashed #000; margin-bottom: 20px; }
+        h2, h3 { text-align: center; margin: 5px 0; }
+        .divider { border-bottom: 1px dashed #000; margin: 10px 0; }
+        .row { display: flex; justify-content: space-between; margin-bottom: 5px; }
+        .bold { font-weight: bold; }
+        /* Hide UI elements during actual printing */
+        @media print { .no-print { display: none; } }
+    </style>
+</head>
+<body>
+    <div class="no-print" style="text-align: center; padding: 10px; background: #eee;">
+        <button onclick="window.print()" style="padding: 10px 20px; cursor: pointer;">Print Again</button>
+        <button onclick="window.close()" style="padding: 10px 20px; cursor: pointer;">Close</button>
+    </div>
+
+    <div class="receipt-wrapper">
+        <!-- COPY 1: CUSTOMER -->
+        <div class="receipt">
+            <h2>CEMENT & COFFEE</h2>
+            <h3>CUSTOMER COPY</h3>
+            <div class="divider"></div>
+            <div class="row"><span>Order ID:</span> <span>{{ order_id }}</span></div>
+            <div class="row"><span>Customer:</span> <span>{{ customer }}</span></div>
+            <div class="divider"></div>
+            <div id="items-list-1"></div>
+            <div class="divider"></div>
+            <div class="row bold"><span>TOTAL:</span> <span>₱{{ total }}</span></div>
+            <div class="divider"></div>
+            <p style="text-align: center; font-size: 12px;">Thank you for your business!</p>
+        </div>
+
+        <!-- COPY 2: CASHIER -->
+        <div class="receipt">
+            <h2>CEMENT & COFFEE</h2>
+            <h3>CASHIER COPY</h3>
+            <div class="divider"></div>
+            <div class="row"><span>Order ID:</span> <span>{{ order_id }}</span></div>
+            <div class="row"><span>Customer:</span> <span>{{ customer }}</span></div>
+            <div class="divider"></div>
+            <div id="items-list-2"></div>
+            <div class="divider"></div>
+            <div class="row bold"><span>TOTAL:</span> <span>₱{{ total }}</span></div>
+        </div>
+    </div>
+
+    <script>
+        // Parse items string (Format: ItemNamexQty-Price,ItemNamexQty-Price)
+        const itemsRaw = "{{ items }}";
+        const formatItems = () => {
+            if(!itemsRaw) return "<p>Walk-in items</p>";
+            let html = "";
+            itemsRaw.split(',').forEach(item => {
+                let parts = item.split('-');
+                html += `<div class="row"><span>${parts[0]}</span> <span>₱${parts[1] || '0'}</span></div>`;
+            });
+            return html;
+        };
+        document.getElementById('items-list-1').innerHTML = formatItems();
+        document.getElementById('items-list-2').innerHTML = formatItems();
+        
+        // Auto-print upon loading
+        window.onload = function() { window.print(); };
+    </script>
+</body>
+</html>

@@ -1,0 +1,88 @@
+/* static/style.css */
+:root {
+  --cement-light: #e0e4e7;
+  --cement-mid: #9ba0a5;
+  --cement-dark: #4a4e51;
+  --coffee-gold: #f5c15a;
+  --coffee-dark: #2c1e16;
+  --danger: #d9534f;
+}
+
+body {
+  background-color: var(--cement-light);
+  background-image: url('data:image/svg+xml,%3Csvg width="100" height="100" xmlns="http://www.w3.org/2000/svg"%3E%3Cfilter id="noise"%3E%3CfeTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="4" stitchTiles="stitch"/%3E%3C/filter%3E%3Crect width="100" height="100" filter="url(%23noise)" opacity="0.05"/%3E%3C/svg%3E');
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: var(--cement-dark);
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.navbar {
+  background-color: var(--cement-dark);
+  color: var(--cement-light);
+  padding: 15px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+}
+
+.nav-brand { font-size: 1.5rem; font-weight: bold; color: var(--coffee-gold); }
+
+.container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+/* Cement Card UI */
+.card {
+  background: #cdd1d4;
+  border: 2px solid #888d91;
+  box-shadow: 4px 4px 0px var(--cement-mid);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+/* Forms & Inputs */
+input, select, textarea {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 10px;
+  background: #e8eaeb;
+  border: 1px solid var(--cement-mid);
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+input:focus { outline: 2px solid var(--coffee-gold); }
+
+/* Buttons */
+.btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  text-transform: uppercase;
+  transition: all 0.2s;
+}
+
+.btn-primary { background: var(--coffee-gold); color: var(--coffee-dark); border: 2px solid #b88a38; box-shadow: 2px 2px 0px #b88a38; }
+.btn-primary:active { box-shadow: 0px 0px 0px; transform: translate(2px, 2px); }
+.btn-danger { background: var(--danger); color: white; }
+.btn-secondary { background: var(--cement-dark); color: white; }
+
+/* Grids */
+.menu-grid, .dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+/* Hidden views */
+.view-section { display: none; }
+.view-section.active { display: block; }
+
+/* Status Badges */
+.status-preparing { color: #f0ad4e; font-weight: bold; }
+.status-picked-up { color: #5bc0de; font-weight: bold; }
+.status-arriving { color: #5cb85c; font-weight: bold; }

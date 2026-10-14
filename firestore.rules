@@ -1,0 +1,43 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+    function signedIn() { return request.auth != null; }
+    function myRole() { return get(/databases/$(db)/documents/users/$(request.auth.uid)).data.role; }
+    match /users/{uid} {
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.role in ['customer','rider','cashier','admin'];
+      allow read: if signedIn() && (request.auth.uid == uid || myRole() in ['admin','cashier']);
+      allow update: if signedIn() && (request.auth.uid == uid || myRole() == 'admin');
+      allow delete: if signedIn() && myRole() == 'admin';
+    }
+    match /products/{id} {
+      allow read: if true;
+      allow write: if signedIn() && myRole() == 'admin';
+    }
+    match /orders/{id} {
+      allow create: if signedIn() && (myRole() == 'customer' || myRole() == 'cashier');
+      allow read: if signedIn();
+      allow update: if signedIn() && (
+        resource.data.customerId == request.auth.uid ||
+        resource.data.riderId == request.auth.uid ||
+        myRole() in ['admin','cashier','rider']);
+      allow delete: if signedIn() && myRole() == 'admin';
+    }
+    match /reservations/{id} {
+      allow create: if signedIn() && myRole() == 'customer';
+      allow read: if signedIn();
+      allow update: if signedIn() && myRole() in ['admin','cashier'];
+      allow delete: if signedIn() && myRole() == 'admin';
+    }
+    match /reports/{id} {
+      allow create: if signedIn();
+      allow read: if signedIn() && (myRole() in ['admin','cashier'] || resource.data.byUid == request.auth.uid);
+      allow update, delete: if signedIn() && myRole() == 'admin';
+    }
+    match /punches/{id} {
+      allow create: if signedIn() && myRole() in ['cashier','admin'];
+      allow read: if signedIn() && myRole() in ['admin','cashier'];
+      allow update, delete: if signedIn() && myRole() == 'admin';
+    }
+  }
+}
